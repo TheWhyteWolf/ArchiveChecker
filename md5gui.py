@@ -51,15 +51,22 @@ def _md5_of_file(filepath: Path, chunk_size: int = 1 << 20) -> str:
 
 def _load_db(db_path: Path) -> dict:
     if db_path.exists():
-        with open(db_path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+        try:
+            with open(db_path, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except json.JSONDecodeError as e:
+            # Corrupted file — back it up and start fresh
+            backup = db_path.with_suffix(".json.bak")
+            db_path.rename(backup)
+            print(f"[md5gui] WARNING: corrupt DB backed up to {backup} — starting fresh. ({e})")
     return {}
 
 
 def _save_db(db: dict, db_path: Path) -> None:
-    with open(db_path, "w", encoding="utf-8") as fh:
+    tmp = db_path.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
         json.dump(db, fh, indent=2, ensure_ascii=False)
-
+    tmp.replace(db_path)  # atomic rename — prevents corruption on interrupted saves
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
@@ -252,9 +259,17 @@ class App(tk.Tk):
         threading.Thread(target=self._do_crawl, daemon=True).start()
 
     def _do_crawl(self):
-        folder   = self._folder_path
-        db_path  = self.db_path
-        db       = _load_db(db_path)
+        folder  = self._folder_path
+        db_path = self.db_path
+        tmp     = db_path.with_suffix(".json.tmp")
+
+        try:
+            db = _load_db(db_path)
+        except Exception as e:
+            self.after(0, lambda: self.status_label.config(text=f"DB load error: {e}", fg=RED))
+            self.after(0, lambda: self.run_btn.config(text="▶  RUN CRAWLER", bg=PURPLE))
+            self._running = False
+            return
 
         all_files = [p for p in folder.rglob("*") if p.is_file()]
         total     = len(all_files)
@@ -287,29 +302,33 @@ class App(tk.Tk):
                 added += 1
                 self.after(0, self._append_row, rel, md5, "add")
 
+            # Write progress to tmp after every file
+            _save_db(db, tmp)
+
         if self._running:  # completed naturally
-            _save_db(db, db_path)
+            tmp.replace(db_path)  # atomic promotion to real DB
             summary = f"✔ {added} added  ·  {skipped} skipped  ·  {errors} errors  ·  {len(db)} total"
             self.after(0, lambda: self.status_label.config(text=summary, fg=GREEN))
             self.after(0, lambda: self._flash(GREEN if errors == 0 else YELLOW))
         else:
-            self.after(0, lambda: self.status_label.config(text="Stopped — DB not saved", fg=YELLOW))
+            # Stopped mid-crawl — leave .tmp on disk for inspection, don't touch real DB
+            self.after(0, lambda: self.status_label.config(
+                text=f"Stopped — partial results in {tmp.name}", fg=YELLOW))
 
         self.after(0, lambda: self.progress_var.set(""))
         self.after(0, lambda: self.run_btn.config(text="▶  RUN CRAWLER", bg=PURPLE))
         self._running = False
-
-    # ── Result rows ───────────────────────────────────────────────────────────
+        # ── Result rows ───────────────────────────────────────────────────────────
 
     def _append_row(self, rel_path: str, md5: str, kind: str):
-        row = tk.Frame(self.results_inner, bg=PANEL)
-        row.pack(fill="x", padx=6, pady=1)
+            row = tk.Frame(self.results_inner, bg=PANEL)
+            row.pack(fill="x", padx=6, pady=1)
 
-        icon, colour = ("✦", YELLOW) if kind == "add" else ("·", TEXT_DIM)
+            icon, colour = ("✦", YELLOW) if kind == "add" else ("·", TEXT_DIM)
 
-        tk.Label(row, text=icon,              bg=PANEL, fg=colour,   font=("Courier", 10, "bold"), width=2).pack(side="left")
-        tk.Label(row, text=Path(rel_path).name, bg=PANEL, fg=TEXT,   font=("Courier", 9), anchor="w").pack(side="left", padx=(4, 8))
-        tk.Label(row, text=md5,               bg=PANEL, fg=TEXT_HASH, font=("Courier", 8), anchor="e").pack(side="right")
+            tk.Label(row, text=icon,              bg=PANEL, fg=colour,   font=("Courier", 10, "bold"), width=2).pack(side="left")
+            tk.Label(row, text=Path(rel_path).name, bg=PANEL, fg=TEXT,   font=("Courier", 9), anchor="w").pack(side="left", padx=(4, 8))
+            tk.Label(row, text=md5,               bg=PANEL, fg=TEXT_HASH, font=("Courier", 8), anchor="e").pack(side="right")
 
     def _append_error_row(self, rel_path: str, msg: str):
         row = tk.Frame(self.results_inner, bg=PANEL)
