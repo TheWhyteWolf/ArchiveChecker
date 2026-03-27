@@ -12,7 +12,9 @@ md5checker/
 ```
 
 ---
-
+Platform	Action Required
+Windows	Install Pillow; optionally install tkinterdnd2 for drag-and-drop; run via python gui.py not ./gui.py
+macOS	Install Pillow; optionally install tkinterdnd2; Python 3.10+ required
 ## CLI usage
 
 ```bash
