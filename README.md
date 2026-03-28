@@ -58,18 +58,3 @@ Plain JSON — easy to edit by hand or sync with version control:
 ```
 
 ---
-
-## Using `core.py` directly
-
-```python
-from core import check_file, add_to_database
-
-result = check_file("archive.zip")
-
-if result.in_library:
-    print("In library", result.label)
-else:
-    print("NEW ARCHIVE — md5:", result.md5)
-    # optionally add it
-    add_to_database(result.md5, label="archive.zip")
-```
