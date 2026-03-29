@@ -8,6 +8,13 @@ Requires **Python 3.10+** (uses the `match`-free walrus operator, stdlib only).
 **Windows**	  Install Pillow; optionally install tkinterdnd2 for drag-and-drop; run via python gui.py not ./gui.py
 **macOS**	    Install Pillow; optionally install tkinterdnd2; Python 3.10+ required
 
+## md5sumtojson converter included.
+
+## GUI USAGE
+To create new archive use md5gui.py
+To check your collection against database use CheckerGUI.py
+
+
 ## CLI usage
 
 ```bash
