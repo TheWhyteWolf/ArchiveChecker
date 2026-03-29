@@ -2,14 +2,6 @@
 
 A portable, zero-dependency MD5 file checker for linux.  
 Requires **Python 3.10+** (uses the `match`-free walrus operator, stdlib only).
-
-```
-md5checker/
-├── core.py            # shared logic — import this in any frontend
-├── cli.py             # command-line interface
-├── gui.py             # (coming next) tkinter GUI
-└── md5_database.json  # hash database (auto-created if missing)
-```
 ---
 **Platform**	Action Required  
 
